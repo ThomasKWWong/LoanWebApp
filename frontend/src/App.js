@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 
 const App = () => {
+  const [msamdOptions, setMsamdOptions] = useState([]);
+  const [countyOptions, setCountyOptions] = useState([]);
   const [filters, setFilters] = useState({
     msamd: "",
     incomeToDebtMin: "",
     incomeToDebtMax: "",
-    counties: [],
+    county: "",
     loanType: "",
     tractToMsamdIncomeMin: "",
     tractToMsamdIncomeMax: "",
@@ -18,24 +20,54 @@ const App = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFilters({ ...filters, [name]: value });
+    // fetch("http://localhost:8080/api/county") // Replace with your backend URL if different
+    //   .then((response) => {
+    //     if (!response.ok) {
+    //       throw new Error("Network response was not ok " + response.statusText);
+    //     }
+    //     return response.text(); // Assuming the Spring Boot endpoint returns plain text
+    //   })
+    //   .then((data) => {
+    //     console.log(data); // Set the response to the state
+    //   })
+    //   .catch((error) => {
+    //     console.error("Error fetching data: ", error);
+    //   });
   };
 
+  useEffect(() => {
+    const fetchMsamdOptions = async () => {
+      const response = await fetch('http://localhost:8080/api/msamd');
+      const data = await response.json();
+      setMsamdOptions(data);
+    };
+
+    const fetchCountyOptions = async () => {
+      const response = await fetch('http://localhost:8080/api/county');
+      const data = await response.json();
+      setCountyOptions(data);
+    };
+
+    fetchMsamdOptions();
+    fetchCountyOptions();
+  }, []);
+  
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Filters submitted:", filters);
     // Send these filters to the Spring backend using fetch or axios
-    fetch("http://localhost:8080/apply-filters", {
+    fetch("http://localhost:8080/api/filters", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(filters),
     })
-      .then((response) => response.json())
+      .then((response) => response.text()) // Use .json() if the response is in JSON format
       .then((data) => {
-        console.log("Data from backend:", data);
+        console.log("Data from backend:", data); // This will log "Filters processed successfully"
       })
-      .catch((error) => console.error("Error:", error));
+      .catch((error) => console.error("Error:", error));    
   };
 
   return (
@@ -44,12 +76,14 @@ const App = () => {
       <form onSubmit={handleSubmit}>
         <div>
           <label>MSAMD:</label>
-          <input
-            type="text"
-            name="msamd"
-            value={filters.msamd}
-            onChange={handleInputChange}
-          />
+          <select name="msamd" value={filters.msamd} onChange={handleInputChange}>
+            <option value="">Select MSAMD</option>
+            {msamdOptions.map((msamd) => (
+              <option key={msamd} value={msamd}>
+                {msamd}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label>Income to Debt Ratio:</label>
@@ -70,12 +104,14 @@ const App = () => {
         </div>
         <div>
           <label>County:</label>
-          <input
-            type="text"
-            name="counties"
-            value={filters.counties}
-            onChange={handleInputChange}
-          />
+          <select name="county" value={filters.county} onChange={handleInputChange}>
+            <option value="">Select County</option>
+            {countyOptions.map((county) => (
+              <option key={county} value={county}>
+                {county}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label>Loan Type:</label>

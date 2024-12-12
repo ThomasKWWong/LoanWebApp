@@ -59,70 +59,6 @@ public class DemoApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(DemoApplication.class, args);
-
-        //static example for query_creator
-        ArrayList<String> filters = new ArrayList<>(Arrays.asList("MSAMD = 41180", "COUNTY_CODE = 189"));
-		String SQL_SELECT = query_creator(filters);
-
-		//Open database connection
-		try (Connection conn = DriverManager.getConnection(
-                "jdbc:postgresql://127.0.0.1:5432/postgres", "postgres", "Tkw321123$")) {
-
-            if (conn != null) {
-                System.out.println("Connected to the database!");
-                System.out.println(SQL_SELECT);
-				PreparedStatement preparedStatement = conn.prepareStatement(SQL_SELECT);
-				ResultSet resultSet = preparedStatement.executeQuery();
-				while (resultSet.next()){
-					System.out.println(resultSet.getString("RESPONDENT_ID"));
-                }
-
-
-                String createTemp_SQL_SELECT = "CREATE TEMPORARY TABLE temp_filtered AS " + SQL_SELECT;
-                PreparedStatement stmt = conn.prepareStatement(createTemp_SQL_SELECT);
-                stmt.executeUpdate();
-                System.out.println("Temporary table created successfully.");
-                
-
-                String updateRates_known = "UPDATE temp_filtered SET rate_spread = (rate_spread)+2.33 WHERE rate_spread IS NOT NULL AND lien_status < 3";
-                PreparedStatement update_stmt_1 = conn.prepareStatement(updateRates_known);
-                int rowsUpdated = update_stmt_1.executeUpdate();
-                System.out.println(rowsUpdated + " rows updated for known rates.");
-
-                String updateRates_unknown_lien1 = "UPDATE temp_filtered SET rate_spread = 2.33+1.5 WHERE rate_spread IS NULL AND lien_status = 1";
-                PreparedStatement update_stmt_2 = conn.prepareStatement(updateRates_unknown_lien1);
-                int rowsUpdated_2 = update_stmt_2.executeUpdate();
-                System.out.println(rowsUpdated_2 + " rows updated for unknown rates; lien_status=1.");
-
-                String updateRates_unknown_lien2 = "UPDATE temp_filtered SET rate_spread = 2.33+3.5 WHERE rate_spread IS NULL AND lien_status = 2";
-                PreparedStatement update_stmt_3 = conn.prepareStatement(updateRates_unknown_lien2);
-                int rowsUpdated_3 = update_stmt_3.executeUpdate();
-                System.out.println(rowsUpdated_3 + " rows updated for unknown rates; lien_status=2.");
-
-
-                String getRate_Total = "SELECT (SUM(rate_spread * loan_amount_000s) / SUM(loan_amount_000s)) AS avg_rate, (SUM(loan_amount_000s)) AS total_loan_cost  FROM temp_filtered";
-                PreparedStatement calc_stmt = conn.prepareStatement(getRate_Total);
-                ResultSet result_calc = calc_stmt.executeQuery();
-                while (result_calc.next()){
-                    float rate = result_calc.getFloat("avg_rate");
-                    int total_cost = result_calc.getInt("total_loan_cost");
-
-                    System.out.printf("Loan Amount: $%d%n", total_cost * 1000);
-                    System.out.printf("Interest Rate: %.2f%%%n", rate);
-                } 
-
-          
-
-            } else {
-                System.out.println("Failed to make connection!");
-            }
-
-        } catch (SQLException e) {
-            System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
 	}
 
 }
@@ -163,7 +99,7 @@ class APIController {
     }
 
     @PostMapping("/api/filters")
-    public ResponseEntity<String> processFilters(@RequestBody FilterRequest filterRequest) {
+    public ResponseEntity<List<String>> processFilters(@RequestBody FilterRequest filterRequest) {
         List<String> filters = filterRequest.toFilterList();
         String sqlQuery = query_creator(filters);
         System.out.println("Generated SQL Query: " + sqlQuery);
@@ -174,13 +110,14 @@ class APIController {
             if (conn != null) {
                 System.out.println("Connected to the database!");
                 System.out.println(sqlQuery);
-				PreparedStatement preparedStatement = conn.prepareStatement(sqlQuery);
-				ResultSet resultSet = preparedStatement.executeQuery();
-				while (resultSet.next()){
-					System.out.println(resultSet.getString("RESPONDENT_ID"));
-                }
+				// PreparedStatement preparedStatement = conn.prepareStatement(sqlQuery);
+				// ResultSet resultSet = preparedStatement.executeQuery();
+				// while (resultSet.next()){
+				// 	System.out.println(resultSet.getString("RESPONDENT_ID"));
+                // }
+                return ResponseEntity.ok(calculatePriceAndRate(sqlQuery));
             }
-        return ResponseEntity.ok("Filters processed successfully");
+            return ResponseEntity.ok(calculatePriceAndRate(sqlQuery));
 
         }catch (SQLException e) {
             System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
@@ -189,7 +126,7 @@ class APIController {
             e.printStackTrace();
             ResponseEntity.ok("Filters processed unsuccessfully");
         }
-        return ResponseEntity.ok("Filters processed successfully");
+        return ResponseEntity.ok(calculatePriceAndRate(sqlQuery));
     }
 
     private String query_creator(List<String> filters) {
@@ -200,82 +137,168 @@ class APIController {
         return SQL_SELECT;
     }
 
+    //calculate price and loan from filters
+    private List<String> calculatePriceAndRate(String SQL_SELECT){
+        //Open database connection
+		try (Connection conn = DriverManager.getConnection(
+            "jdbc:postgresql://127.0.0.1:5432/postgres", "postgres", "Tkw321123$")) {
+
+        if (conn != null) {
+            System.out.println("Connected to the database!");
+            System.out.println(SQL_SELECT);
+            PreparedStatement preparedStatement = conn.prepareStatement(SQL_SELECT);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()){
+                System.out.println(resultSet.getString("RESPONDENT_ID"));
+            }
+
+
+            String createTemp_SQL_SELECT = "CREATE TEMPORARY TABLE temp_filtered AS " + SQL_SELECT;
+            PreparedStatement stmt = conn.prepareStatement(createTemp_SQL_SELECT);
+            stmt.executeUpdate();
+            System.out.println("Temporary table created successfully.");
+            
+
+            String updateRates_known = "UPDATE temp_filtered SET rate_spread = (rate_spread)+2.33 WHERE rate_spread IS NOT NULL AND lien_status < 3";
+            PreparedStatement update_stmt_1 = conn.prepareStatement(updateRates_known);
+            int rowsUpdated = update_stmt_1.executeUpdate();
+            System.out.println(rowsUpdated + " rows updated for known rates.");
+
+            String updateRates_unknown_lien1 = "UPDATE temp_filtered SET rate_spread = 2.33+1.5 WHERE rate_spread IS NULL AND lien_status = 1";
+            PreparedStatement update_stmt_2 = conn.prepareStatement(updateRates_unknown_lien1);
+            int rowsUpdated_2 = update_stmt_2.executeUpdate();
+            System.out.println(rowsUpdated_2 + " rows updated for unknown rates; lien_status=1.");
+
+            String updateRates_unknown_lien2 = "UPDATE temp_filtered SET rate_spread = 2.33+3.5 WHERE rate_spread IS NULL AND lien_status = 2";
+            PreparedStatement update_stmt_3 = conn.prepareStatement(updateRates_unknown_lien2);
+            int rowsUpdated_3 = update_stmt_3.executeUpdate();
+            System.out.println(rowsUpdated_3 + " rows updated for unknown rates; lien_status=2.");
+
+
+            String getRate_Total = "SELECT (SUM(rate_spread * loan_amount_000s) / SUM(loan_amount_000s)) AS avg_rate, (SUM(loan_amount_000s)) AS total_loan_cost  FROM temp_filtered";
+            PreparedStatement calc_stmt = conn.prepareStatement(getRate_Total);
+            ResultSet result_calc = calc_stmt.executeQuery();
+            while (result_calc.next()){
+                float rate = result_calc.getFloat("avg_rate");
+                int total_cost = result_calc.getInt("total_loan_cost");
+
+                String loanAmountString = String.format("Loan Amount: $%d", total_cost * 1000);
+                String interestRateString = String.format("Interest Rate: %.2f%%", rate);
+                System.out.println(loanAmountString);
+                System.out.println(interestRateString);
+
+                // Return the two strings as a list
+                return List.of(loanAmountString, interestRateString);
+            } 
+
+        } else {
+            System.out.println("Failed to make connection!");
+            return List.of("error");
+        }
+
+    } catch (SQLException e) {
+        System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
+        return List.of("error");
+    } catch (Exception e) {
+        e.printStackTrace();
+        return List.of("error");
+    }
+    return List.of("error");
+    }
+
     public static class FilterRequest {
         private String msamd;
         private String incomeToDebtMin;
         private String incomeToDebtMax;
-        private String county_name;
-        private String loan_Type;
+        private String countyName;
+        private String loanType;
         private String tractToMsamdIncomeMin;
         private String tractToMsamdIncomeMax;
-        private String loan_Purpose;
-        private String property_Type;
-        private String owner_occupancy;
-
+        private String loanPurpose;
+        private String propertyType;
+        private String ownerOccupancy;
+    
         // Getters and setters
-        public String getMsamd() { return msamd; }
-        public void setMsamd(String msamd) { this.msamd = msamd; }
-        
-        public String getIncomeToDebtMin() { return incomeToDebtMin; }
-        public void setIncomeToDebtMin(String incomeToDebtMin) { this.incomeToDebtMin = incomeToDebtMin; }
-        
-        public String getIncomeToDebtMax() { return incomeToDebtMax; }
-        public void setIncomeToDebtMax(String incomeToDebtMax) { this.incomeToDebtMax = incomeToDebtMax; }
-        
-        public String getCounties() { return county_name; }
-        public void setCounties(String county_name) { this.county_name = county_name; }
-        
-        public String getLoanType() { return loan_Type; }
-        public void setLoanType(String loan_Type) { this.loan_Type = loan_Type; }
-        
-        public String getTractToMsamdIncomeMin() { return tractToMsamdIncomeMin; }
-        public void setTractToMsamdIncomeMin(String tractToMsamdIncomeMin) { this.tractToMsamdIncomeMin = tractToMsamdIncomeMin; }
-        
-        public String getTractToMsamdIncomeMax() { return tractToMsamdIncomeMax; }
-        public void setTractToMsamdIncomeMax(String tractToMsamdIncomeMax) { this.tractToMsamdIncomeMax = tractToMsamdIncomeMax; }
-        
-        public String getLoanPurpose() { return loan_Purpose; }
-        public void setLoanPurpose(String loan_Purpose) { this.loan_Purpose = loan_Purpose; }
-        
-        public String getPropertyType() { return property_Type; }
-        public void setPropertyType(String property_Type) { this.property_Type = property_Type; }
-        
-        public String getOwnerOccupied() { return owner_occupancy; }
-        public void setOwnerOccupied(String owner_occupancy) { this.owner_occupancy = owner_occupancy; }
+        public void setMsamd(String msamd) {
+            this.msamd = msamd;
+        }
 
-        /**
-         * Converts the FilterRequest into a list of SQL conditions.
-         * Each field is converted into a condition like: MSAMD = 'value'
-         * 
-         * @return List of SQL filters
-         */
+        public void setIncomeToDebtMin(String incomeToDebtMin) {
+            this.incomeToDebtMin = incomeToDebtMin;
+        }
+
+        public void setIncomeToDebtMax(String incomeToDebtMax) {
+            this.incomeToDebtMax = incomeToDebtMax;
+        }
+
+        public void setCountyName(String countyName) {
+            this.countyName = countyName;
+        }
+
+        public void setLoanType(String loanType) {
+            this.loanType = loanType;
+        }
+
+        public void setTractToMsamdIncomeMin(String tractToMsamdIncomeMin) {
+            this.tractToMsamdIncomeMin = tractToMsamdIncomeMin;
+        }
+
+        public void setTractToMsamdIncomeMax(String tractToMsamdIncomeMax) {
+            this.tractToMsamdIncomeMax = tractToMsamdIncomeMax;
+        }
+
+        public void setLoanPurpose(String loanPurpose) {
+            this.loanPurpose = loanPurpose;
+        }
+
+        public void setPropertyType(String propertyType) {
+            this.propertyType = propertyType;
+        }
+
+        public void setOwnerOccupancy(String ownerOccupancy) {
+            this.ownerOccupancy = ownerOccupancy;
+        }
+        
         public List<String> toFilterList() {
             List<String> filters = new ArrayList<>();
-            try {
-                Field[] fields = this.getClass().getDeclaredFields();
-                for (Field field : fields) {
-                    field.setAccessible(true); // Make private fields accessible
-                    Object value = field.get(this); // Get the value of the field
-
-                    if (value != null && !value.toString().isEmpty()) {
-                        String fieldName = field.getName().toUpperCase();
-
-                        if (fieldName.contains("MIN")) {
-                            // Example: INCOME_TO_DEBT_MIN -> INCOME_TO_DEBT >= value
-                            String baseName = fieldName.replace("MIN", "");
-                            filters.add(baseName + " >= '" + value + "'");
-                        } else if (fieldName.contains("MAX")) {
-                            // Example: INCOME_TO_DEBT_MAX -> INCOME_TO_DEBT <= value
-                            String baseName = fieldName.replace("MAX", "");
-                            filters.add(baseName + " <= " + value);
-                        } else {
-                            // Standard case: MSAMD = 'value'
-                            filters.add(fieldName + " = " + value);
-                        }
-                    }
-                }
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
+            
+            // // Log incoming field values to debug issues
+            // System.out.println("MSAMD: " + msamd);
+            // System.out.println("COUNTY_NAME: " + countyName);
+            // System.out.println("LOAN_TYPE: " + loanType);
+            // System.out.println("LOAN_PURPOSE: " + loanPurpose);
+            // System.out.println("PROPERTY_TYPE: " + propertyType);
+            // System.out.println("OWNER_OCCUPANCY: " + ownerOccupancy);
+            
+            if (msamd != null && !msamd.isEmpty()) {
+                filters.add("MSAMD = '" + msamd + "'");
+            }
+            if (countyName != null && !countyName.isEmpty()) {
+                filters.add("COUNTY_NAME = '" + countyName + "'");
+            }
+            if (loanType != null && !loanType.isEmpty()) {
+                filters.add("LOAN_TYPE = '" + loanType + "'");
+            }
+            if (loanPurpose != null && !loanPurpose.isEmpty()) {
+                filters.add("LOAN_PURPOSE = '" + loanPurpose + "'");
+            }
+            if (propertyType != null && !propertyType.isEmpty()) {
+                filters.add("PROPERTY_TYPE = '" + propertyType + "'");
+            }
+            if (ownerOccupancy != null && !ownerOccupancy.isEmpty()) {
+                filters.add("OWNER_OCCUPANCY = '" + ownerOccupancy + "'");
+            }
+            if (tractToMsamdIncomeMin != null && !tractToMsamdIncomeMin.isEmpty()){
+                filters.add("tract_to_msamd_income > " + tractToMsamdIncomeMin);
+            }
+            if (tractToMsamdIncomeMax != null && !tractToMsamdIncomeMax.isEmpty()){
+                filters.add("tract_to_msamd_income < " + tractToMsamdIncomeMax);
+            }
+            if (incomeToDebtMin != null && !incomeToDebtMin.isEmpty()){
+                filters.add("(applicant_income_000s/loan_amount_000s) > " + incomeToDebtMin);
+            }
+            if (incomeToDebtMax != null && !incomeToDebtMax.isEmpty()){
+                filters.add("(applicant_income_000s/loan_amount_000s) < " + incomeToDebtMax);
             }
             return filters;
         }

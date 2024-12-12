@@ -17,22 +17,15 @@ const App = () => {
     ownerOccupied: "",
   });
 
+  // **New state for the response from the backend**
+  const [responseData, setResponseData] = useState([]);
+  
+  // **New state to track if results should be displayed**
+  const [showResults, setShowResults] = useState(false);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFilters({ ...filters, [name]: value });
-    // fetch("http://localhost:8080/api/county") // Replace with your backend URL if different
-    //   .then((response) => {
-    //     if (!response.ok) {
-    //       throw new Error("Network response was not ok " + response.statusText);
-    //     }
-    //     return response.text(); // Assuming the Spring Boot endpoint returns plain text
-    //   })
-    //   .then((data) => {
-    //     console.log(data); // Set the response to the state
-    //   })
-    //   .catch((error) => {
-    //     console.error("Error fetching data: ", error);
-    //   });
   };
 
   useEffect(() => {
@@ -55,7 +48,8 @@ const App = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Filters submitted:", filters);
-    // Send these filters to the Spring backend using fetch or axios
+    
+    // **Send the filters to the backend**
     fetch("http://localhost:8080/api/filters", {
       method: "POST",
       headers: {
@@ -63,11 +57,27 @@ const App = () => {
       },
       body: JSON.stringify(filters),
     })
-      .then((response) => response.text()) // Use .json() if the response is in JSON format
+      .then((response) => response.json())
       .then((data) => {
-        console.log("Data from backend:", data); // This will log "Filters processed successfully"
+        console.log("Data from backend:", data); 
+        setResponseData(data); 
+        setShowResults(true); // **Show the results once the data is received**
       })
       .catch((error) => console.error("Error:", error));    
+  };
+
+  // **Handle Approve button click**
+  const handleApprove = () => {
+    console.log("Approved");
+    // You can send an approval status to the backend here if needed
+  };
+
+  // **Handle Deny button click**
+  const handleDeny = () => {
+    console.log("Denied");
+    // Reset the response data and hide the results
+    setResponseData([]);
+    setShowResults(false);
   };
 
   return (
@@ -85,6 +95,7 @@ const App = () => {
             ))}
           </select>
         </div>
+
         <div>
           <label>Income to Debt Ratio:</label>
           <input
@@ -102,6 +113,7 @@ const App = () => {
             onChange={handleInputChange}
           />
         </div>
+
         <div>
           <label>County:</label>
           <select name="county" value={filters.county} onChange={handleInputChange}>
@@ -113,6 +125,7 @@ const App = () => {
             ))}
           </select>
         </div>
+
         <div>
           <label>Loan Type:</label>
           <select
@@ -127,6 +140,7 @@ const App = () => {
             <option value="4">FSA/RHS</option>
           </select>
         </div>
+
         <div>
           <label>Tract to MSAMD Income:</label>
           <input
@@ -144,6 +158,7 @@ const App = () => {
             onChange={handleInputChange}
           />
         </div>
+
         <div>
           <label>Loan Purpose:</label>
           <select
@@ -157,6 +172,7 @@ const App = () => {
             <option value="3">Refinancing</option>
           </select>
         </div>
+
         <div>
           <label>Property Type:</label>
           <select
@@ -170,6 +186,7 @@ const App = () => {
             <option value="3">Multifamily</option>
           </select>
         </div>
+
         <div>
           <label>Owner Occupied:</label>
           <select
@@ -183,8 +200,27 @@ const App = () => {
             <option value="3">Not applicable</option>
           </select>
         </div>
+
         <button type="submit">Apply Filters</button>
       </form>
+
+      {/* **Conditional rendering of the results** */}
+      {showResults && (
+        <>
+          <h2>Results</h2>
+          <div>
+            {responseData.map((item, index) => (
+              <p key={index}>{item}</p>
+            ))}
+          </div>
+
+          {/* **Approve and Deny buttons** */}
+          <div>
+            <button onClick={handleApprove}>Approve</button>
+            <button onClick={handleDeny}>Deny</button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

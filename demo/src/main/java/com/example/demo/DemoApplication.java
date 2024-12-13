@@ -207,10 +207,10 @@ class APIController {
     }
 
     public static class FilterRequest {
-        private String msamd;
+        private List<String> msamd; // List of MSAMD values
         private String incomeToDebtMin;
         private String incomeToDebtMax;
-        private String countyName;
+        private List<String> countyName; // List of county names
         private String loanType;
         private String tractToMsamdIncomeMin;
         private String tractToMsamdIncomeMax;
@@ -219,38 +219,42 @@ class APIController {
         private String ownerOccupancy;
     
         // Getters and setters
-        public void setMsamd(String msamd) {
+        public List<String> getMsamd() {
+            return msamd;
+        }
+    
+        public void setMsamd(List<String> msamd) {
             this.msamd = msamd;
         }
-
+    
         public void setIncomeToDebtMin(String incomeToDebtMin) {
             this.incomeToDebtMin = incomeToDebtMin;
         }
-
+    
         public void setIncomeToDebtMax(String incomeToDebtMax) {
             this.incomeToDebtMax = incomeToDebtMax;
         }
-
-        public void setCountyName(String countyName) {
+    
+        public void setCountyName(List<String> countyName) {
             this.countyName = countyName;
         }
-
+    
         public void setLoanType(String loanType) {
             this.loanType = loanType;
         }
-
+    
         public void setTractToMsamdIncomeMin(String tractToMsamdIncomeMin) {
             this.tractToMsamdIncomeMin = tractToMsamdIncomeMin;
         }
-
+    
         public void setTractToMsamdIncomeMax(String tractToMsamdIncomeMax) {
             this.tractToMsamdIncomeMax = tractToMsamdIncomeMax;
         }
-
+    
         public void setLoanPurpose(String loanPurpose) {
             this.loanPurpose = loanPurpose;
         }
-
+    
         public void setPropertyType(String propertyType) {
             this.propertyType = propertyType;
         }
@@ -258,49 +262,58 @@ class APIController {
         public void setOwnerOccupancy(String ownerOccupancy) {
             this.ownerOccupancy = ownerOccupancy;
         }
-        
+    
+        // Convert to a list of filters for the SQL query
         public List<String> toFilterList() {
             List<String> filters = new ArrayList<>();
-            
-            // // Log incoming field values to debug issues
-            // System.out.println("MSAMD: " + msamd);
-            // System.out.println("COUNTY_NAME: " + countyName);
-            // System.out.println("LOAN_TYPE: " + loanType);
-            // System.out.println("LOAN_PURPOSE: " + loanPurpose);
-            // System.out.println("PROPERTY_TYPE: " + propertyType);
-            // System.out.println("OWNER_OCCUPANCY: " + ownerOccupancy);
-            
+    
+            // Handle MSAMD (Allow multiple values)
             if (msamd != null && !msamd.isEmpty()) {
-                filters.add("MSAMD = '" + msamd + "'");
+                filters.add("MSAMD IN (" + String.join(", ", msamd) + ")");
             }
+    
+            // Handle County Name (Allow multiple values)
             if (countyName != null && !countyName.isEmpty()) {
-                filters.add("COUNTY_NAME = '" + countyName + "'");
+                filters.add("COUNTY_NAME IN ('" + String.join("', '", countyName) + "')");
             }
+    
+            // Handle other filters (single values for these fields)
             if (loanType != null && !loanType.isEmpty()) {
                 filters.add("LOAN_TYPE = '" + loanType + "'");
             }
+    
             if (loanPurpose != null && !loanPurpose.isEmpty()) {
                 filters.add("LOAN_PURPOSE = '" + loanPurpose + "'");
             }
+    
             if (propertyType != null && !propertyType.isEmpty()) {
                 filters.add("PROPERTY_TYPE = '" + propertyType + "'");
             }
+    
             if (ownerOccupancy != null && !ownerOccupancy.isEmpty()) {
                 filters.add("OWNER_OCCUPANCY = '" + ownerOccupancy + "'");
             }
-            if (tractToMsamdIncomeMin != null && !tractToMsamdIncomeMin.isEmpty()){
-                filters.add("tract_to_msamd_income > " + tractToMsamdIncomeMin);
+    
+            // Handle numeric filters (income/debt ratio, etc.)
+            if (tractToMsamdIncomeMin != null && !tractToMsamdIncomeMin.isEmpty()) {
+                filters.add("TRACT_TO_MSAMD_INCOME > " + tractToMsamdIncomeMin);
             }
-            if (tractToMsamdIncomeMax != null && !tractToMsamdIncomeMax.isEmpty()){
-                filters.add("tract_to_msamd_income < " + tractToMsamdIncomeMax);
+    
+            if (tractToMsamdIncomeMax != null && !tractToMsamdIncomeMax.isEmpty()) {
+                filters.add("TRACT_TO_MSAMD_INCOME < " + tractToMsamdIncomeMax);
             }
-            if (incomeToDebtMin != null && !incomeToDebtMin.isEmpty()){
-                filters.add("(applicant_income_000s/loan_amount_000s) > " + incomeToDebtMin);
+    
+            if (incomeToDebtMin != null && !incomeToDebtMin.isEmpty()) {
+                filters.add("(APPLICANT_INCOME_000S / LOAN_AMOUNT_000S) > " + incomeToDebtMin);
             }
-            if (incomeToDebtMax != null && !incomeToDebtMax.isEmpty()){
-                filters.add("(applicant_income_000s/loan_amount_000s) < " + incomeToDebtMax);
+    
+            if (incomeToDebtMax != null && !incomeToDebtMax.isEmpty()) {
+                filters.add("(APPLICANT_INCOME_000S / LOAN_AMOUNT_000S) < " + incomeToDebtMax);
             }
+
             return filters;
         }
     }
+    
+    
 }

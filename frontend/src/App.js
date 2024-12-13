@@ -1,14 +1,52 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 
+// Custom Dropdown component with checkboxes
+const DropdownCheckbox = ({ label, options, selectedValues, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen);
+  };
+
+  const handleCheckboxChange = (value) => {
+    const newValues = selectedValues.includes(value)
+      ? selectedValues.filter((item) => item !== value)
+      : [...selectedValues, value];
+    onChange(newValues);
+  };
+
+  return (
+    <div className="dropdown">
+      <button type="button" className="dropdown-button" onClick={toggleDropdown}>
+        {label}: {selectedValues.length > 0 ? `${selectedValues.length} selected` : "Select"}
+      </button>
+      {isOpen && (
+        <div className="dropdown-menu">
+          {options.map((option) => (
+            <label key={option} className="dropdown-item">
+              <input
+                type="checkbox"
+                checked={selectedValues.includes(option)}
+                onChange={() => handleCheckboxChange(option)}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const App = () => {
   const [msamdOptions, setMsamdOptions] = useState([]);
   const [countyOptions, setCountyOptions] = useState([]);
   const [filters, setFilters] = useState({
-    msamd: "",
+    msamd: [],
     incomeToDebtMin: "",
     incomeToDebtMax: "",
-    county: "",
+    countyName: [],
     loanType: "",
     tractToMsamdIncomeMin: "",
     tractToMsamdIncomeMax: "",
@@ -48,7 +86,7 @@ const App = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Filters submitted:", filters);
-    
+  
     // **Send the filters to the backend**
     fetch("http://localhost:8080/api/filters", {
       method: "POST",
@@ -60,11 +98,13 @@ const App = () => {
       .then((response) => response.json())
       .then((data) => {
         console.log("Data from backend:", data); 
-        setResponseData(data); 
+        // Ensure that the response data is always an array
+        setResponseData(Array.isArray(data) ? data : []);
         setShowResults(true); // **Show the results once the data is received**
       })
-      .catch((error) => console.error("Error:", error));    
+      .catch((error) => console.error("Error:", error));
   };
+  
 
   // **Handle Approve button click**
   const handleApprove = () => {
@@ -84,18 +124,16 @@ const App = () => {
     <div className="App">
       <h1>Filter Options</h1>
       <form onSubmit={handleSubmit}>
-        <div>
-          <label>MSAMD:</label>
-          <select name="msamd" value={filters.msamd} onChange={handleInputChange}>
-            <option value="">Select MSAMD</option>
-            {msamdOptions.map((msamd) => (
-              <option key={msamd} value={msamd}>
-                {msamd}
-              </option>
-            ))}
-          </select>
-        </div>
-
+        
+        {/* MSAMD Dropdown with Checkboxes */}
+        <DropdownCheckbox 
+          label="MSAMD" 
+          options={msamdOptions} 
+          selectedValues={filters.msamd} 
+          onChange={(selectedMsamd) => setFilters({ ...filters, msamd: selectedMsamd })} 
+        />
+        
+        {/* Income to Debt Ratio Inputs */}
         <div>
           <label>Income to Debt Ratio:</label>
           <input
@@ -114,18 +152,15 @@ const App = () => {
           />
         </div>
 
-        <div>
-          <label>County:</label>
-          <select name="county" value={filters.county} onChange={handleInputChange}>
-            <option value="">Select County</option>
-            {countyOptions.map((county) => (
-              <option key={county} value={county}>
-                {county}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* County Dropdown with Checkboxes */}
+        <DropdownCheckbox 
+          label="County" 
+          options={countyOptions} 
+          selectedValues={filters.countyName} 
+          onChange={(selectedCounty) => setFilters({ ...filters, countyName: selectedCounty })} 
+        />
 
+        {/* Loan Type */}
         <div>
           <label>Loan Type:</label>
           <select
@@ -141,6 +176,7 @@ const App = () => {
           </select>
         </div>
 
+        {/* Tract to MSAMD Income Inputs */}
         <div>
           <label>Tract to MSAMD Income:</label>
           <input
@@ -159,6 +195,7 @@ const App = () => {
           />
         </div>
 
+        {/* Loan Purpose */}
         <div>
           <label>Loan Purpose:</label>
           <select
@@ -173,6 +210,7 @@ const App = () => {
           </select>
         </div>
 
+        {/* Property Type */}
         <div>
           <label>Property Type:</label>
           <select
@@ -187,6 +225,7 @@ const App = () => {
           </select>
         </div>
 
+        {/* Owner Occupied */}
         <div>
           <label>Owner Occupied:</label>
           <select

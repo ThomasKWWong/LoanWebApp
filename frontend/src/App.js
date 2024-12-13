@@ -107,8 +107,9 @@ const App = () => {
   
 
   // **Handle Approve button click**
-  const handleApprove = () => {
+  const handleApprove = async () => {
     console.log("Approved");
+    const response = await fetch('http://localhost:8080/api/approve')
     // You can send an approval status to the backend here if needed
   };
 

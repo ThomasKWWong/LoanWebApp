@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import javax.sql.DataSource;
+
 import java.sql.ResultSetMetaData;
 import java.util.HashMap;
 import java.lang.reflect.Field;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.beans.factory.annotation.Autowired;
 // import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -65,6 +69,9 @@ public class DemoApplication {
 
 @RestController
 class APIController {
+    // Global variable to store the filters (shared across all users)
+    private static List<String> lastFilters;
+
     @GetMapping("/api/hello")
     public String sayHello() {
         return "Hello from Spring Boot!";
@@ -100,8 +107,8 @@ class APIController {
 
     @PostMapping("/api/filters")
     public ResponseEntity<List<String>> processFilters(@RequestBody FilterRequest filterRequest) {
-        List<String> filters = filterRequest.toFilterList();
-        String sqlQuery = query_creator(filters);
+        lastFilters = filterRequest.toFilterList();
+        String sqlQuery = query_creator(lastFilters);
         System.out.println("Generated SQL Query: " + sqlQuery);
         
         try (Connection conn = DriverManager.getConnection(
@@ -204,6 +211,35 @@ class APIController {
         return List.of("error");
     }
     return List.of("error");
+    }
+
+    //Updates database after approval ********************
+    @GetMapping("/api/approve")
+    public ResponseEntity<String> updatePurchaser_Preliminary() {
+        try (Connection conn = DriverManager.getConnection(
+            "jdbc:postgresql://127.0.0.1:5432/postgres", "postgres", "Tkw321123$")) {
+
+        String SQL_SELECT = query_creator(lastFilters);
+        String createTemp_SQL_SELECT = "CREATE TEMPORARY TABLE temp_filtered AS " + SQL_SELECT;
+        PreparedStatement stmt = conn.prepareStatement(createTemp_SQL_SELECT);
+        stmt.executeUpdate();
+        System.out.println("Temporary table created successfully.");
+
+        if (conn != null) {
+            String update_Purchaser = 
+                "UPDATE SMALL_PRELIMINARY " + 
+                "SET purchaser_type_name = 'private securitization', purchaser_type = 5 " + 
+                "FROM temp_filtered " + 
+                "WHERE SMALL_PRELIMINARY.application_id = temp_filtered.application_id";
+            PreparedStatement update_stmt_4 = conn.prepareStatement(update_Purchaser);
+            int rowsUpdated_4 = update_stmt_4.executeUpdate();
+            System.out.println(rowsUpdated_4 + " rows updated for purchaser_type in Preliminary");
+        }
+        return ResponseEntity.ok("Successfully approved");
+        } catch (SQLException e) {
+            System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
+            return ResponseEntity.ok("Unapproved");
+        }
     }
 
     public static class FilterRequest {
@@ -310,6 +346,8 @@ class APIController {
             if (incomeToDebtMax != null && !incomeToDebtMax.isEmpty()) {
                 filters.add("(APPLICANT_INCOME_000S / LOAN_AMOUNT_000S) < " + incomeToDebtMax);
             }
+
+            filters.add("purchaser_type IN (0,1,2,3,4,8)");
 
             return filters;
         }

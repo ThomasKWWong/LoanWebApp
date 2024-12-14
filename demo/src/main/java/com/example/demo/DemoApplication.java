@@ -242,6 +242,106 @@ class APIController {
         }
     }
 
+    @PostMapping("/api/add")
+    public ResponseEntity<String> postMethodName(@RequestBody AddRequest entity) {
+        try (Connection conn = DriverManager.getConnection(
+            "jdbc:postgresql://127.0.0.1:5432/postgres", "postgres", "Tkw321123$")) {
+        if (conn != null) {
+            System.out.println("hit");
+            String addQuery = entity.toSQLQuery();
+            PreparedStatement update_stmt_4 = conn.prepareStatement(addQuery);
+            System.out.println(addQuery);
+            update_stmt_4.executeUpdate();
+            return ResponseEntity.ok("Successfully added");
+        }
+        } catch (SQLException e) {
+            System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
+            return ResponseEntity.ok("Unable to be added");
+        }
+        return ResponseEntity.ok("Successfully added");
+    }
+    
+    public static class AddRequest {
+        private String countyName;
+        private String msamd;
+        private String tractToMsamdIncome;
+        private String loanType;
+        private String loanPurpose;
+        private String propertyType;
+        private String ownerOccupied;
+
+        //Getters and setters
+        public void setCountyName(String countyName){
+            this.countyName = countyName;
+        }
+        public void setMsamd(String msamd){
+            this.msamd = msamd;
+        }
+        public void setTractToMsamdIncome(String tractToMsamdIncome){
+            this.tractToMsamdIncome = tractToMsamdIncome;
+        }
+        public void setLoanType(String loanType){
+            this.loanType = loanType;
+        }
+        public void setLoanPurpose(String loanPurpose){
+            this.loanPurpose = loanPurpose;
+        }
+        public void setPropertyType(String propertyType){
+            this.propertyType = propertyType;
+        }
+        public void setOwnerOccupied(String ownerOccupied){
+            this.ownerOccupied = ownerOccupied;
+        }
+
+        public String toSQLQuery() {
+            // Prepare the values for the fields received in the request
+            String countyNameValue = "'" + countyName + "'";
+            String msamdValue = "'" + msamd + "'";
+            String tractToMsamdIncomeValue = "'" + tractToMsamdIncome + "'";
+            String loanTypeValue = "'" + loanType + "'";
+            String loanPurposeValue = "'" + loanPurpose + "'";
+            String propertyTypeValue = "'" + propertyType + "'";
+            String ownerOccupiedValue = "'" + ownerOccupied + "'";
+            String applicationIDValue = "'";
+        
+            try (Connection conn = DriverManager.getConnection(
+                "jdbc:postgresql://127.0.0.1:5432/postgres", "postgres", "Tkw321123$")) {
+            if (conn != null) {
+                String query = "SELECT MAX(application_id) FROM SMALL_PRELIMINARY";
+                PreparedStatement update_stmt_4 = conn.prepareStatement(query);
+                int nextApplicationId = 1;
+                ResultSet rs = update_stmt_4.executeQuery();
+                if (rs.next()) {
+                    // Step 2: Increment the current maximum application_id
+                    nextApplicationId = rs.getInt(1) + 1; 
+                }
+                System.out.println(nextApplicationId);
+                applicationIDValue = applicationIDValue + nextApplicationId + "'";
+                
+            }
+            } catch (SQLException e) {
+                System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
+            }
+
+            // Construct the SQL query
+            String sql = "INSERT INTO SMALL_PRELIMINARY (" +
+                         "county_name, msamd, applicant_income_000s, loan_type, loan_purpose, property_type, owner_occupancy, application_id) "
+                         + "VALUES (" +
+                         countyNameValue + ", " +
+                         msamdValue + ", " +
+                         tractToMsamdIncomeValue + ", " +
+                         loanTypeValue + ", " +
+                         loanPurposeValue + ", " +
+                         propertyTypeValue + ", " +
+                         ownerOccupiedValue + ", " +
+                         applicationIDValue + ")"
+                         ;
+        
+            return sql;
+        }
+        
+    }
+
     public static class FilterRequest {
         private List<String> msamd; // List of MSAMD values
         private String incomeToDebtMin;
@@ -347,7 +447,7 @@ class APIController {
                 filters.add("(APPLICANT_INCOME_000S / LOAN_AMOUNT_000S) < " + incomeToDebtMax);
             }
 
-            filters.add("purchaser_type IN (0,1,2,3,4,8)");
+            filters.add("purchaser_type NOT IN (5,6,7,9) OR purchaser_type IS NULL");
 
             return filters;
         }
